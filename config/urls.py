@@ -1,17 +1,21 @@
 from django.contrib import admin
 from django.urls import path, include
+from django.http import JsonResponse
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
-)
+
+# Optional root welcome view
+def home(request):
+    return JsonResponse({"message": "Welcome to Expenses Tracker API"})
 
 urlpatterns = [
+    path("", home),  # <-- root URL
     path("admin/", admin.site.urls),
+
+    # API schema & docs
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="docs"),
-    path("api/", include("accounts.urls")),   # register/login/logout + admin ban
-    path("api/", include("expenses.urls")),   # expenses CRUD + filters + summaries
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+
+    # Accounts and Expenses APIs
+    path("api/accounts/", include("accounts.urls")),  # register/login/logout + ban
+    path("api/expenses/", include("expenses.urls")),  # expenses CRUD + filters + summaries
 ]

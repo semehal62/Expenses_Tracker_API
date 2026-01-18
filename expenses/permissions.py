@@ -1,6 +1,6 @@
 from rest_framework.permissions import BasePermission
 
-class NotBanned(BasePermission):
+class IsAuthenticatedAndNotBanned(BasePermission):
     message = "User is banned."
 
     def has_permission(self, request, view):

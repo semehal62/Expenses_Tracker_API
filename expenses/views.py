@@ -2,20 +2,23 @@ from django.db.models import Sum
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import action
 from rest_framework.views import APIView
+from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
+
 from .models import Expense
 from .serializers import ExpenseSerializer
-from .permissions import NotBanned
+from .permissions import IsAuthenticatedAndNotBanned
 
 class ExpenseViewSet(viewsets.ModelViewSet):
     serializer_class = ExpenseSerializer
-    permission_classes = [IsAuthenticated, NotBanned]
+    permission_classes = [IsAuthenticated, IsAuthenticatedAndNotBanned]
 
     def get_queryset(self):
         user = self.request.user
-        queryset = Expense.objects.all() if getattr(user, "is_admin", False) else Expense.objects.filter(user=user)
+        queryset = Expense.objects.all() if user.is_staff else Expense.objects.filter(user=user)
 
+        # Filters
         category = self.request.query_params.get("category")
         date_str = self.request.query_params.get("date")
         start_date = self.request.query_params.get("start_date")
@@ -34,15 +37,13 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         serializer.save(user=self.request.user)
 
     def perform_update(self, serializer):
-        if self.request.user != serializer.instance.user and not getattr(self.request.user, "is_admin", False):
-            from rest_framework.exceptions import PermissionDenied
+        if self.request.user != serializer.instance.user and not self.request.user.is_staff:
             raise PermissionDenied("You can only modify your own expenses.")
         serializer.save()
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        if request.user != instance.user and not getattr(request.user, "is_admin", False):
-            from rest_framework.exceptions import PermissionDenied
+        if request.user != instance.user and not request.user.is_staff:
             raise PermissionDenied("You can only delete your own expenses.")
         return super().destroy(request, *args, **kwargs)
 
@@ -59,11 +60,11 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 class SummaryView(APIView):
-    permission_classes = [IsAuthenticated, NotBanned]
+    permission_classes = [IsAuthenticated, IsAuthenticatedAndNotBanned]
 
     def get(self, request, period: str):
         user = request.user
-        qs = Expense.objects.all() if getattr(user, "is_admin", False) else Expense.objects.filter(user=user)
+        qs = Expense.objects.all() if user.is_staff else Expense.objects.filter(user=user)
 
         if period not in ("weekly", "monthly"):
             return Response({"detail": "period must be 'weekly' or 'monthly'"}, status=status.HTTP_400_BAD_REQUEST)
